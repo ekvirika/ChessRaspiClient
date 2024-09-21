@@ -1,23 +1,28 @@
-import unittest
-from Board import Board  # Assuming your board class is in board.py
+from Board import Board
+import requests
 
-class TestBoard(unittest.TestCase):
-    def setUp(self):
-        # This method will run before each test case
-        self.board = Board()
+mainsail_url = "http://<your-raspberry-pi-ip>/printer/gcode/script"  
+def send_gcode(self, gcode):
+        response = requests.post(self.mainsail_url, json={"gcode": gcode})
+        if response.status_code == 200:
+            print(f"G-code '{gcode}' sent successfully!")
+        else:
+            print(f"Error sending G-code: {response.status_code}, {response.text}")
 
-    def test_a1(self):
-        # Test that 'a1' returns the correct Klipper coordinates
-        self.assertEqual(self.board.get_klipper_coords('a1'), (25, 340))
+def main():
+    board = Board()
+    while True:
+        uci_square = input("Enter the chess square (e.g., e2) or 'q' to quit: ").strip().lower()
+        if uci_square == 'q':
+            print("Exiting...")
+            break
+        if len(uci_square) != 2 or uci_square[0] not in board.file_mapping or not (1 <= int(uci_square[1]) <= 8):
+            print("Invalid input. Please enter a valid square (e.g., e2).")
+            continue
 
-    def test_e2(self):
-        # Test that 'e2' returns the correct Klipper coordinates
-        self.assertEqual(self.board.get_klipper_coords('e2'), (25 + 4 * 50, 340 - 50))
+        klipper_coords = board.get_klipper_coords(uci_square)
+        gcode = f"G1 X{klipper_coords[0]} Y{klipper_coords[1]} "
+        board.send_gcode(gcode)
 
-    def test_h8(self):
-        # Test that 'h8' returns the correct Klipper coordinates
-        self.assertEqual(self.board.get_klipper_coords('h8'), (25 + 7 * 50, 340 - 7 * 50))
-
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__ == "__main__":
+    main()
