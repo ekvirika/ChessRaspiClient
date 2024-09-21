@@ -21,7 +21,7 @@ def main():
             continue
 
         klipper_coords = board.get_klipper_coords(uci_square)
-        gcode = f"G1 X{klipper_coords[0]} Y{klipper_coords[1]} "
+        gcode = f"G1 X{klipper_coords[0]} Y{klipper_coords[1]} F6000"
         board.send_gcode(gcode)
 
 if __name__ == "__main__":

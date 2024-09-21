@@ -18,8 +18,8 @@ class Board:
         rank = int(uci_square[1])  # e.g., 1
 
         # Calculate the x and y offsets based on the file and rank
-        x_offset = self.file_mapping[file] * self.step_x
-        y_offset = (rank - 1) * self.step_y
+        y_offset = self.file_mapping[file] * self.step_y
+        x_offset = (rank - 1) * self.step_x
 
         # Calculate the final Klipper coordinates
         klipper_x = self.start_x + x_offset
