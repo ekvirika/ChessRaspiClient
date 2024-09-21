@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./lichess-bot/lichess-bot/lib/li",
+        "./li"
+    ]
+}
