@@ -1,9 +1,27 @@
-import time, Board, SendMove, Electromagnet
+import time
+import requests  # To send HTTP requests to Mainsail
+from Board import Board  # Assuming you have the Board class defined in a file named board.py
+from Electromagnet import Electromagnet  # Assuming Electromagnet class is defined similarly
+
 class ChessboardController:
-    def __init__(self, klipper_host, klipper_port, electromagnet_pin):
+    def __init__(self, mainsail_url, electromagnet_pin):
         self.board = Board()
-        self.klipper = SendMove(klipper_host, klipper_port)
+        self.mainsail_url = mainsail_url
         self.electromagnet = Electromagnet(electromagnet_pin)
+
+    def send_gcode(self, gcode):
+        """Send a G-code command to the Mainsail API."""
+        url = f"{self.mainsail_url}/printer/gcode/script"
+        headers = {'Content-Type': 'application/json'}
+        payload = {'script': gcode}
+
+        try:
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()  # Raise an error for bad status codes
+        except requests.RequestException as e:
+            print(f"Error sending G-code to Mainsail: {e}")
+        else:
+            print(f"G-code sent successfully: {gcode}")
 
     def make_move(self, uci_move):
         """Executes a move on the physical chessboard based on UCI move format e.g., 'e2e4'"""
@@ -16,14 +34,16 @@ class ChessboardController:
 
         if start_coords and end_coords:
             # Move to start square
-            self.klipper.move_to(*start_coords)
+            gcode_start = f"G1 X{start_coords[0]} Y{start_coords[1]} F3000"
+            self.send_gcode(gcode_start)
 
             # Activate electromagnet to pick up the piece
             self.electromagnet.activate()
             time.sleep(1)  # Short delay to ensure piece is magnetized
 
-            # Move to the end square along a "safe path" (you could define this path manually)
-            self.klipper.move_to(*end_coords)
+            # Move to the end square
+            gcode_end = f"G1 X{end_coords[0]} Y{end_coords[1]} F3000"
+            self.send_gcode(gcode_end)
 
             # Deactivate electromagnet to drop the piece
             self.electromagnet.deactivate()
