@@ -33,21 +33,46 @@ class ChessboardController:
         end_coords = self.board.get_klipper_coords(end_square)
 
         if start_coords and end_coords:
-            # Move to start square
-            gcode_start = f"G1 X{start_coords[0]} Y{start_coords[1]} F3000"
+            # Move to the start square
+            gcode_start = f"G1 X{start_coords[0]} Y{start_coords[1]} F6000"
             self.send_gcode(gcode_start)
 
             # Activate electromagnet to pick up the piece
             self.electromagnet.activate()
             time.sleep(1)  # Short delay to ensure piece is magnetized
+            
+            #Go in the corner
+            gcode_corner = f"G1 X{start_coords[0]+25} Y{start_coords[1]+25} F6000"
+            self.send_gcode(gcode_corner)
+            time.sleep(1) 
 
-            # Move to the end square
-            gcode_end = f"G1 X{end_coords[0]} Y{end_coords[1]} F3000"
-            self.send_gcode(gcode_end)
+            # First move vertically to the destination row (Y-axis move)
+            gcode_vertical_move = f"G1 Y{end_coords[1]-25} F3000"
+            self.send_gcode(gcode_vertical_move)
+            time.sleep(0.5)  # Delay to ensure the vertical move is complete
 
+            # Then move horizontally to the destination column (X-axis move)
+            gcode_horizontal_move = f"G1 X{end_coords[0]-25} F3000"
+            self.send_gcode(gcode_horizontal_move)
+            time.sleep(0.5)  # Delay to ensure the horizontal move is complete
+
+            gcode_corner = f"G1 X{end_coords[0]+25} Y{end_coords[1]+25} F6000"
+            self.send_gcode(gcode_corner)
+            time.sleep(1) 
+            
             # Deactivate electromagnet to drop the piece
             self.electromagnet.deactivate()
             time.sleep(1)  # Short delay to ensure piece is dropped
 
         else:
             print("Invalid UCI move or coordinates not found!")
+
+# Example usage
+if __name__ == "__main__":
+    mainsail_url = "http://your-mainsail-url"  # Replace with your Mainsail URL
+    electromagnet_pin = 17  # Example GPIO pin for electromagnet
+    chessboard_controller = ChessboardController(mainsail_url, electromagnet_pin)
+    
+    while True:
+        uci_move = input("Enter your move (e.g., e2e4): ")
+        chessboard_controller.make_move(uci_move)
