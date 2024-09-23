@@ -34,32 +34,23 @@ class ChessboardController:
 
         if start_coords and end_coords:
             # Move to the start square
-            gcode_start = f"G1 X{start_coords[0]} Y{start_coords[1]} F6000"
+            gcode_start = f"G1 X{start_coords[0]} Y{start_coords[1]} F3000"
             self.send_gcode(gcode_start)
 
             # Activate electromagnet to pick up the piece
             self.electromagnet.activate()
             time.sleep(1)  # Short delay to ensure piece is magnetized
-            
-            #Go in the corner
-            gcode_corner = f"G1 X{start_coords[0]+25} Y{start_coords[1]+25} F6000"
-            self.send_gcode(gcode_corner)
-            time.sleep(1) 
 
             # First move vertically to the destination row (Y-axis move)
-            gcode_vertical_move = f"G1 Y{end_coords[1]-25} F3000"
+            gcode_vertical_move = f"G1 Y{end_coords[1]} F3000"
             self.send_gcode(gcode_vertical_move)
             time.sleep(0.5)  # Delay to ensure the vertical move is complete
 
             # Then move horizontally to the destination column (X-axis move)
-            gcode_horizontal_move = f"G1 X{end_coords[0]-25} F3000"
+            gcode_horizontal_move = f"G1 X{end_coords[0]} F3000"
             self.send_gcode(gcode_horizontal_move)
             time.sleep(0.5)  # Delay to ensure the horizontal move is complete
 
-            gcode_corner = f"G1 X{end_coords[0]+25} Y{end_coords[1]+25} F6000"
-            self.send_gcode(gcode_corner)
-            time.sleep(1) 
-            
             # Deactivate electromagnet to drop the piece
             self.electromagnet.deactivate()
             time.sleep(1)  # Short delay to ensure piece is dropped
