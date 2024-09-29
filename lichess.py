@@ -1,4 +1,4 @@
-import requests
+import requests, socket
 import time
 import threading
 
@@ -72,7 +72,7 @@ def check_challenges_and_events():
                 elif '"type":"gameStart"' in event:
                     game_id = event.split('"gameId":"')[1].split('"')[0]
                     print(f"Game started: {game_id}")
-                    game_thread = threading.Thread(target=play_game, args=(game_id,))
+                    game_thread = threading.Thread(target=play_game, args=(game_id, 'black'))
                     game_thread.start()
     else:
         print(f"Error streaming events: {response.status_code}, {response.text}")
@@ -94,46 +94,78 @@ def handle_user_move(game_id):
         send_move_to_lichess(game_id, user_move)
 
 
-# Stream game moves and handle them in real-time
-def play_game(game_id):
+def send_move_to_raspberry_pi(move):
+    raspberry_pi_ip = '172.20.10.2'  # Replace with your Raspberry Pi's IP
+    port = 12350
+
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((raspberry_pi_ip, port))
+        client_socket.settimeout(10)
+        # Send the move to the Raspberry Pi
+        client_socket.sendall(move.encode())
+        print(f"Sent move {move} to Raspberry Pi")
+
+        # client_socket.close()
+    except Exception as e:
+        print(f"Error sending move to Raspberry Pi: {e}")
+    finally:
+        # Ensure the socket is always closed after the move is sent
+        client_socket.close()
+        print("Closed socket connection to Raspberry Pi.")
+
+def play_game(game_id, my_color):
     url = f"https://lichess.org/api/bot/game/stream/{game_id}"
     response = requests.get(url, headers=headers, stream=True)
 
     if response.status_code == 200:
-        last_move = None
+        moves = []  # To track move history
+
         for line in response.iter_lines():
             if line:
                 event = line.decode('utf-8')
                 if '"type":"gameState"' in event:
-                    moves = event.split('"moves":"')[1].split('"')[0].split()
-                    if moves and moves[-1] != last_move:
-                        last_move = moves[-1]
-                        print(f"Opponent's move: {last_move}")
-                        user_move = input(
-                            "Enter your move (e.g., e2e4), 'r' to resign, 'd' to offer a draw, or 'q' to quit: ").strip().lower()
-                        if user_move == 'q':
-                            print("Quitting game...")
-                            break
-                        elif user_move == 'r':
-                            resign_game(game_id)
-                            break
-                        elif user_move == 'd':
-                            offer_draw(game_id)
-                        else:
-                            send_move_to_lichess(game_id, user_move)
-    else:
-        print(f"Error retrieving game stream: {response.status_code}, {response.text}")
+                    new_moves = event.split('"moves":"')[1].split('"')[0].split()
 
+                    # Process only the new moves
+                    if len(new_moves) > len(moves):
+                        for i in range(len(moves), len(new_moves)):
+                            move = new_moves[i]
+
+                            # Classify move based on turn
+                            if (i % 2 == 0 and my_color == 'white') or (i % 2 == 1 and my_color == 'black'):
+                                print(f"My move: {move}")
+                            else:
+                                print(f"Opponent's move: {move}")
+                                send_move_to_raspberry_pi(move)
+
+                        # Update the move list with the latest moves
+                        moves = new_moves  
+                    
+                    # Allow player input when it's their turn
+                    if (len(moves) % 2 == 0 and my_color == 'white') or (len(moves) % 2 == 1 and my_color == 'black'):
+                        handle_user_move(game_id)
+
+    else:
+        print(f"Error streaming game: {response.status_code}, {response.text}")
 
 # Send move to Lichess
 def send_move_to_lichess(game_id, move):
     url = f"https://lichess.org/api/bot/game/{game_id}/move/{move}"
     response = requests.post(url, headers=headers)
+    
     if response.status_code == 200:
         print(f"Move '{move}' sent successfully!")
     else:
+        # Invalid move handling
         print(f"Error sending move: {response.status_code}, {response.text}")
-        play_game(game_id)
+        if response.status_code == 400:
+            # Bad request, likely an invalid move
+            print(f"Invalid move '{move}'. Please enter a valid move.")
+            handle_user_move(game_id)  # Prompt the user to enter another move
+        else:
+            print("An unexpected error occurred. Please try again.")
+
 #
 
 # Offer a draw
@@ -156,6 +188,43 @@ def resign_game(game_id):
         print(f"Error resigning game: {response.status_code}, {response.text}")
 
 
+# Get game information, including the player's color
+def get_game_info(game_id):
+    url = f"https://lichess.org/api/bot/game/{game_id}"
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        color = data.get('color', 'white')  # Default to white if color is not found
+        print(f"Your color is: {color}")
+        return color
+    else:
+        print(f"Error getting game info: {response.status_code}, {response.text}")
+        return 'black'  # Default to white if there's an error
+
+    import requests
+
+def get_lichess_game_state(game_id, token):
+    """
+    Get the current game state from Lichess, including the FEN string.
+    """
+    url = f"https://lichess.org/api/game/stream/{game_id}"
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+    
+    response = requests.get(url, headers=headers, stream=True)
+    
+    for line in response.iter_lines():
+        if line:
+            data = line.decode('utf-8')
+            # Assuming that the FEN string is included in the data stream
+            print(data)  # This will print the full data, including FEN and move details
+            return data  # Return or process the FEN string from here
+
+# Example usage
+
+
 # Main function
 def main():
     challenge_thread = threading.Thread(target=check_challenges_and_events)
@@ -163,11 +232,13 @@ def main():
 
     game_id = get_active_game_id()
     if game_id:
-        print(f"Found active game {game_id}")
-        play_game(game_id)
+        # print(f"Found active game {game_id}")
+        # # Modify this part of your code
+        color = get_game_info(game_id)  # This function should return 'white' or 'black
+        play_game(game_id, color)  # Pass the color as an argument to play_game()
+        # print(get_lichess_game_state(game_id, lichess_token))
     else:
         print("No active game found. Waiting for challenges...")
-
 
 if __name__ == "__main__":
     main()

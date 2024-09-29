@@ -1,45 +1,34 @@
 import cv2
-import time
+import numpy as np
 
-# Open the webcam (0 for default, change if needed)
-cap = cv2.VideoCapture(1)
+# Initialize a list to store the points
+points = []
 
-# Set up frame rate for 2 frames per second
-frame_rate = 2
-prev = 0
+# Mouse callback function to capture points
+def get_points(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        points.append((x, y))
 
-def process_frame(frame):
-    # Example preprocessing (convert to grayscale)
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+# Load the image
+image = cv2.imread('chessboard.jpg')
+clone = image.copy()
 
-    # Example: Feed it to a chessboard recognition AI model (you need to implement this)
-    # chessboard_state = recognize_chessboard(gray_frame)
+# Create a window and set a mouse callback
+cv2.namedWindow('image')
+cv2.setMouseCallback('image', get_points)
 
-    # Print or store the recognized state
-    print("Processed frame for chessboard recognition")
-
+# Display the image and wait for 4 corner points to be selected
 while True:
-    time_elapsed = time.time() - prev
-    ret, frame = cap.read()
+    cv2.imshow('image', image)
+    key = cv2.waitKey(1) & 0xFF
 
-    if time_elapsed > 1./frame_rate:
-        prev = time.time()
+    # Break the loop once 4 points are selected
+    if len(points) == 4:
+        break
 
-        # If frame is read correctly
-        if ret:
-            # Process the frame
-            # (You can save it, display it, or feed it to an AI model)
-            cv2.imshow("Camo Stream", frame)
-            
-            # This is where you will process the frame
-            # e.g., pass frame to a chessboard recognition model
-            process_frame(frame)
+    # If 'r' is pressed, reset the image and points
+    if key == ord('r'):
+        image = clone.copy()
+        points = []
 
-        # Break the loop if 'q' is pressed
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-
-# Release the capture and close any OpenCV windows
-cap.release()
 cv2.destroyAllWindows()
